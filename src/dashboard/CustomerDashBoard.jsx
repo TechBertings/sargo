@@ -428,7 +428,7 @@ const getMaxAvailableDuration = async (tableId, date, startTime) => {
     .select('start_time, time_end, duration')
     .eq('table_id', tableId)
     .eq('reservation_date', date)
-    .neq('status', 'cancelled')
+    .not('status', 'in', '(cancelled,synced)')
     .order('start_time', { ascending: true });
 
   if (resError) {
@@ -575,7 +575,7 @@ const getAvailableTimes = async (tableId, date) => {
     .select('start_time, time_end, duration')
     .eq('table_id', tableId)
     .eq('reservation_date', date)
-    .neq('status', 'cancelled');
+    .not('status', 'in', '(cancelled,synced)');
 
   if (resError) {
     console.error('Error fetching reservations:', resError);
