@@ -26,7 +26,9 @@ const sidebarPages = [
   "History",
   "Profile",
   "CancelBookings",
-  
+ "RejectedBookings",
+
+  "RejectedFrontdesk",
   // Maintenance/Admin
   "User Management",
   "Reference",
