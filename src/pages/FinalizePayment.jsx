@@ -20,8 +20,8 @@ export default function FinalizePayment() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [selectedExtension, setSelectedExtension] = useState('');
   const [combinedData, setCombinedData] = useState([]);
-  
- // SYNC PAYMENT STATES
+
+  // SYNC PAYMENT STATES
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncAmount, setSyncAmount] = useState('');
 
@@ -50,37 +50,37 @@ export default function FinalizePayment() {
       console.error('Error fetching extensions:', error);
     }
   };
-const handleSyncPaymentClick = (payment) => {
+  const handleSyncPaymentClick = (payment) => {
     setSelectedPayment(payment);
     setSyncAmount(payment.total_bill?.toString() || '');
     setShowSyncModal(true);
   };
 
- const handleSyncPaymentSubmit = async () => {
-  if (!selectedPayment || !syncAmount) {
-    await Swal.fire({
-      icon: 'warning',
-      title: 'Amount Required',
-      text: 'Please enter the total bill amount.',
-      confirmButtonColor: '#f59e0b'
-    });
-    return;
-  }
+  const handleSyncPaymentSubmit = async () => {
+    if (!selectedPayment || !syncAmount) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Amount Required',
+        text: 'Please enter the total bill amount.',
+        confirmButtonColor: '#f59e0b'
+      });
+      return;
+    }
 
-  const amount = parseFloat(syncAmount);
-  if (isNaN(amount) || amount <= 0) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Invalid Amount',
-      text: 'Please enter a valid amount.',
-      confirmButtonColor: '#ef4444'
-    });
-    return;
-  }
+    const amount = parseFloat(syncAmount);
+    if (isNaN(amount) || amount <= 0) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Amount',
+        text: 'Please enter a valid amount.',
+        confirmButtonColor: '#ef4444'
+      });
+      return;
+    }
 
-  const confirmSync = await Swal.fire({
-    title: 'Sync Payment?',
-    html: `
+    const confirmSync = await Swal.fire({
+      title: 'Sync Payment?',
+      html: `
       <div style="text-align: left; padding: 20px;">
         <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #0ea5e9;">
           <p style="margin: 5px 0; color: #0369a1; font-size: 14px;">Total Bill Amount</p>
@@ -94,106 +94,106 @@ const handleSyncPaymentClick = (payment) => {
         </p>
       </div>
     `,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Sync Payment',
-    cancelButtonText: 'Cancel',
-    confirmButtonColor: '#3b82f6',
-    cancelButtonColor: '#6b7280',
-  });
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sync Payment',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#6b7280',
+    });
 
-  if (!confirmSync.isConfirmed) return;
+    if (!confirmSync.isConfirmed) return;
 
-  Swal.fire({
-    title: 'Syncing Payment...',
-    html: '<div style="padding: 20px;"><p style="margin-top: 15px; font-size: 16px;">Please wait...</p></div>',
-    allowOutsideClick: false,
-    showConfirmButton: false,
-    didOpen: () => {
-      Swal.showLoading();
-    }
-  });
-
-  try {
-    // ✅ Update reservation with new total_bill AND set status to "synced"
-    const { error: updateError } = await supabase
-      .from('reservation')
-      .update({ 
-        total_bill: amount,
-        status: 'synced',  // ✅ NEW: Mark as synced
-        payment_status: 'Completed'
-      })
-      .eq('id', selectedPayment.id);
-
-    if (updateError) throw updateError;
-
-    // Generate reference number
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    const second = String(now.getSeconds()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const autoRefNumber = `${year}${month}${day}${hour}${minute}${second}${random}`;
-
-    let paymentMethod = 'cash';
-    if (selectedPayment.paymentMethod) {
-      const method = selectedPayment.paymentMethod.toLowerCase();
-      const validMethods = ['cash', 'gcash', 'card', 'online'];
-      if (validMethods.includes(method)) {
-        paymentMethod = method;
+    Swal.fire({
+      title: 'Syncing Payment...',
+      html: '<div style="padding: 20px;"><p style="margin-top: 15px; font-size: 16px;">Please wait...</p></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
       }
-    }
+    });
 
-    // Check if payment already exists
-    const { data: existingPayment } = await supabase
-      .from('payment')
-      .select('payment_id')
-      .eq('reservation_id', selectedPayment.id)
-      .single();
+    try {
+      // ✅ Update reservation with new total_bill AND set status to "synced"
+      const { error: updateError } = await supabase
+        .from('reservation')
+        .update({
+          total_bill: amount,
+          status: 'synced',  // ✅ NEW: Mark as synced
+          payment_status: 'Completed'
+        })
+        .eq('id', selectedPayment.id);
 
-    if (existingPayment) {
+      if (updateError) throw updateError;
+
+      // Generate reference number
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hour = String(now.getHours()).padStart(2, '0');
+      const minute = String(now.getMinutes()).padStart(2, '0');
+      const second = String(now.getSeconds()).padStart(2, '0');
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const autoRefNumber = `${year}${month}${day}${hour}${minute}${second}${random}`;
+
+      let paymentMethod = 'cash';
+      if (selectedPayment.paymentMethod) {
+        const method = selectedPayment.paymentMethod.toLowerCase();
+        const validMethods = ['cash', 'gcash', 'card', 'online'];
+        if (validMethods.includes(method)) {
+          paymentMethod = method;
+        }
+      }
+
+      // Check if payment already exists
+      const { data: existingPayment } = await supabase
+        .from('payment')
+        .select('payment_id')
+        .eq('reservation_id', selectedPayment.id)
+        .single();
+
+      if (existingPayment) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Payment Already Synced',
+          text: 'This reservation has already been synced to the payment table.',
+          confirmButtonColor: '#f59e0b'
+        });
+        setShowSyncModal(false);
+        fetchPayments(); // Refresh to remove from list
+        return;
+      }
+
+      // Insert into payment table
+      const paymentData = {
+        reservation_id: selectedPayment.id,
+        account_id: selectedPayment.account_id,
+        amount: amount,
+        total_bill: amount,
+        method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        reference_number: autoRefNumber,
+        status: 'completed',
+        payment_type: selectedPayment.payment_type,
+        table_id: selectedPayment.table_id,
+        billiard_type: selectedPayment.billiard_type
+      };
+
+      const { error: paymentError } = await supabase
+        .from('payment')
+        .insert([paymentData]);
+
+      if (paymentError) {
+        console.error('Payment insert error:', paymentError);
+        throw new Error('Failed to sync payment: ' + paymentError.message);
+      }
+
       await Swal.fire({
-        icon: 'warning',
-        title: 'Payment Already Synced',
-        text: 'This reservation has already been synced to the payment table.',
-        confirmButtonColor: '#f59e0b'
-      });
-      setShowSyncModal(false);
-      fetchPayments(); // Refresh to remove from list
-      return;
-    }
-
-    // Insert into payment table
-    const paymentData = {
-      reservation_id: selectedPayment.id,
-      account_id: selectedPayment.account_id,
-      amount: amount,
-      total_bill: amount,
-      method: paymentMethod,
-      payment_date: new Date().toISOString(),
-      reference_number: autoRefNumber,
-      status: 'completed',
-      payment_type: selectedPayment.payment_type,
-      table_id: selectedPayment.table_id,
-      billiard_type: selectedPayment.billiard_type
-    };
-
-    const { error: paymentError } = await supabase
-      .from('payment')
-      .insert([paymentData]);
-
-    if (paymentError) {
-      console.error('Payment insert error:', paymentError);
-      throw new Error('Failed to sync payment: ' + paymentError.message);
-    }
-
-    await Swal.fire({
-      icon: 'success',
-      title: 'Payment Synced!',
-      html: `
+        icon: 'success',
+        title: 'Payment Synced!',
+        html: `
         <div style="text-align: center; margin: 20px 0;">
           <p style="margin-bottom: 10px;">Payment has been successfully synced!</p>
           <p style="color: #10b981; font-weight: bold;">Amount: ₱${amount}</p>
@@ -204,25 +204,25 @@ const handleSyncPaymentClick = (payment) => {
           </p>
         </div>
       `,
-      timer: 3000,
-      showConfirmButton: false
-    });
+        timer: 3000,
+        showConfirmButton: false
+      });
 
-    setShowSyncModal(false);
-    setSelectedPayment(null);
-    setSyncAmount('');
-    fetchPayments(); // ✅ This will now exclude synced reservations
+      setShowSyncModal(false);
+      setSelectedPayment(null);
+      setSyncAmount('');
+      fetchPayments(); // ✅ This will now exclude synced reservations
 
-  } catch (error) {
-    console.error('Error syncing payment:', error);
-    await Swal.fire({
-      icon: 'error',
-      title: 'Sync Failed',
-      text: error.message || 'Failed to sync payment. Please try again.',
-      confirmButtonColor: '#ef4444'
-    });
-  }
-};
+    } catch (error) {
+      console.error('Error syncing payment:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Sync Failed',
+        text: error.message || 'Failed to sync payment. Please try again.',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  };
   const getExtensionPrice = (billiardType, hours) => {
     const extension = extensions.find(
       ext => ext.billiard_type === billiardType && parseFloat(ext.extension_hours) === parseFloat(hours)
@@ -274,55 +274,55 @@ const handleSyncPaymentClick = (payment) => {
     }
   };
 
-const fetchPayments = async () => {
-  setLoading(true);
-  try {
-    const { data: reservationData, error: reservationError } = await supabase
-      .from('reservation')
-      .select('*')
-      .in('status', ['ongoing', 'approved', 'completed']) // ✅ Removed 'synced' from here
-      .order('reservation_date', { ascending: false })
-      .order('start_time', { ascending: true });
+  const fetchPayments = async () => {
+    setLoading(true);
+    try {
+      const { data: reservationData, error: reservationError } = await supabase
+        .from('reservation')
+        .select('*')
+        .in('status', ['ongoing', 'approved', 'completed', 'synced']) // ✅ May 'synced' na
+        .order('reservation_date', { ascending: false })
+        .order('start_time', { ascending: true });
 
-    if (reservationError) throw reservationError;
+      if (reservationError) throw reservationError;
 
-    const { data: accountsData, error: accountsError } = await supabase
-      .from('accounts')
-      .select('account_id, email');
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('accounts')
+        .select('account_id, email');
 
-    const { data: customersData, error: customersError } = await supabase
-      .from('customer')
-      .select('customer_id, account_id, first_name, last_name, middle_name');
+      const { data: customersData, error: customersError } = await supabase
+        .from('customer')
+        .select('customer_id, account_id, first_name, last_name, middle_name');
 
-    if (accountsError) throw accountsError;
-    if (customersError) throw customersError;
+      if (accountsError) throw accountsError;
+      if (customersError) throw customersError;
 
-    const combinedData = reservationData.map(reservation => {
-      const account = accountsData.find(acc => acc.account_id === reservation.account_id);
-      const customer = customersData.find(c => c.account_id === reservation.account_id);
-      return {
-        ...reservation,
-        accounts: {
-          ...account,
-          customer: customer || null
-        }
-      };
-    });
+      const combinedData = reservationData.map(reservation => {
+        const account = accountsData.find(acc => acc.account_id === reservation.account_id);
+        const customer = customersData.find(c => c.account_id === reservation.account_id);
+        return {
+          ...reservation,
+          accounts: {
+            ...account,
+            customer: customer || null
+          }
+        };
+      });
 
-    const active = combinedData.filter(r => r.status === 'ongoing');
-    const pending = combinedData.filter(r => r.status === 'approved');
-    const completed = combinedData.filter(r => r.status === 'completed');
+      const active = combinedData.filter(r => r.status === 'ongoing');
+      const pending = combinedData.filter(r => r.status === 'approved');
+      const completed = combinedData.filter(r => r.status === 'completed' || r.status === 'synced'); // ✅ Include synced
 
-    setActivePayments(active);
-    setPendingPayments(pending);
-    setCompletedPayments(completed);
+      setActivePayments(active);
+      setPendingPayments(pending);
+      setCompletedPayments(completed);
 
-  } catch (error) {
-    console.error('Error fetching payments:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -332,27 +332,27 @@ const fetchPayments = async () => {
   };
 
   const handleEndSession = async (id) => {
-  const payment = activePayments.find(p => p.id === id);
-  if (!payment) return;
+    const payment = activePayments.find(p => p.id === id);
+    if (!payment) return;
 
-  const totalBill = payment.total_bill || 0;
-  const paymentType = payment.payment_type;
+    const totalBill = payment.total_bill || 0;
+    const paymentType = payment.payment_type;
 
-  let totalPaid = 0;
+    let totalPaid = 0;
 
-  if (paymentType === 'Full Payment') {
-    totalPaid = payment.full_amount || 0;
-  } else if (paymentType === 'Half Payment') {
-    totalPaid = payment.half_amount || 0;
-  }
+    if (paymentType === 'Full Payment') {
+      totalPaid = payment.full_amount || 0;
+    } else if (paymentType === 'Half Payment') {
+      totalPaid = payment.half_amount || 0;
+    }
 
-  if (totalPaid < totalBill) {
-    const remaining = totalBill - totalPaid;
+    if (totalPaid < totalBill) {
+      const remaining = totalBill - totalPaid;
 
-    const paymentChoice = await Swal.fire({
-      icon: 'warning',
-      title: 'Payment Incomplete!',
-      html: `
+      const paymentChoice = await Swal.fire({
+        icon: 'warning',
+        title: 'Payment Incomplete!',
+        html: `
       <div style="text-align: left; margin: 20px 0;">
         <p style="margin-bottom: 10px;"><strong>Cannot end session!</strong></p>
         <p style="margin-bottom: 8px;">Total Bill: <strong>₱${totalBill}</strong></p>
@@ -362,32 +362,153 @@ const fetchPayments = async () => {
         <p style="color: #666;">Please complete the full payment before ending the session.</p>
       </div>
     `,
+        showCancelButton: true,
+        confirmButtonText: 'Pay Now',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+      });
+
+      if (!paymentChoice.isConfirmed) return;
+
+      try {
+        let updateData = {
+          status: 'completed',
+          payment_status: 'Completed',
+          End_Session: true,
+          End_Session_Notice: true
+        };
+
+        if (paymentType === 'Full Payment') {
+          updateData.full_amount = totalBill;
+        } else if (paymentType === 'Half Payment') {
+          updateData.half_amount = totalBill;
+        }
+
+        const { error } = await supabase
+          .from('reservation')
+          .update(updateData)
+          .eq('id', id);
+
+        if (error) throw error;
+
+        // AUTO SYNC TO PAYMENT TABLE
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const autoRefNumber = `${year}${month}${day}${hour}${minute}${second}${random}`;
+
+        let paymentMethod = 'cash';
+        if (payment.paymentMethod) {
+          const method = payment.paymentMethod.toLowerCase();
+          const validMethods = ['cash', 'gcash', 'card', 'online'];
+          if (validMethods.includes(method)) {
+            paymentMethod = method;
+          }
+        }
+
+        // Check if payment already exists
+        const { data: existingPayment } = await supabase
+          .from('payment')
+          .select('payment_id')
+          .eq('reservation_id', payment.id)
+          .single();
+
+        if (!existingPayment) {
+          const paymentData = {
+            reservation_id: payment.id,
+            account_id: payment.account_id,
+            amount: totalBill,
+            total_bill: totalBill,
+            method: paymentMethod,
+            payment_date: new Date().toISOString(),
+            reference_number: autoRefNumber,
+            status: 'completed',
+            payment_type: payment.payment_type,
+            table_id: payment.table_id,
+            billiard_type: payment.billiard_type
+          };
+
+          const { error: paymentError } = await supabase
+            .from('payment')
+            .insert([paymentData]);
+
+          if (paymentError) {
+            console.error('Payment insert error:', paymentError);
+            throw new Error('Failed to sync payment: ' + paymentError.message);
+          }
+        }
+
+        await Swal.fire({
+          icon: 'success',
+          title: 'Payment Complete!',
+          html: `
+        <div style="text-align: center; margin: 20px 0;">
+          <p style="margin-bottom: 10px;">Remaining balance of <strong>₱${remaining}</strong> has been paid.</p>
+          <p style="color: #10b981; font-weight: bold;">Session completed and synced successfully!</p>
+          <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">Reference: ${autoRefNumber}</p>
+        </div>
+      `,
+          timer: 2500,
+          showConfirmButton: false
+        });
+
+        await supabase
+          .from('transaction_history')
+          .insert({
+            table_id: payment.table_id,
+            reservation_date: payment.reservation_date,
+            start_time: payment.start_time,
+            duration: payment.duration,
+            status: 'completed',
+            extension: payment.extension || 0,
+            time_end: calculateEndTime(payment.start_time, payment.duration),
+            paymentMethod: 'Cash',
+            billiard_type: payment.billiard_type,
+            amount: totalBill
+          });
+
+        fetchPayments();
+        return;
+      } catch (error) {
+        console.error('Error processing payment:', error);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to process payment. Please try again.',
+          confirmButtonColor: '#ef4444'
+        });
+        return;
+      }
+    }
+
+    const result = await Swal.fire({
+      title: 'End Session?',
+      text: 'Are you sure you want to end this session?',
+      icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Pay Now',
-      cancelButtonText: 'Cancel',
       confirmButtonColor: '#10b981',
       cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, end session',
+      cancelButtonText: 'Cancel'
     });
 
-    if (!paymentChoice.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
     try {
-      let updateData = {
-        status: 'completed',
-        payment_status: 'Completed',
-        End_Session: true,
-        End_Session_Notice: true
-      };
-
-      if (paymentType === 'Full Payment') {
-        updateData.full_amount = totalBill;
-      } else if (paymentType === 'Half Payment') {
-        updateData.half_amount = totalBill;
-      }
-
       const { error } = await supabase
         .from('reservation')
-        .update(updateData)
+        .update({
+          status: 'completed',
+          payment_status: 'Completed',
+          End_Session: true,
+          End_Session_Notice: true
+        })
         .eq('id', id);
 
       if (error) throw error;
@@ -423,7 +544,7 @@ const fetchPayments = async () => {
         const paymentData = {
           reservation_id: payment.id,
           account_id: payment.account_id,
-          amount: totalBill,
+          amount: totalPaid,
           total_bill: totalBill,
           method: paymentMethod,
           payment_date: new Date().toISOString(),
@@ -446,15 +567,14 @@ const fetchPayments = async () => {
 
       await Swal.fire({
         icon: 'success',
-        title: 'Payment Complete!',
+        title: 'Session Ended!',
         html: `
         <div style="text-align: center; margin: 20px 0;">
-          <p style="margin-bottom: 10px;">Remaining balance of <strong>₱${remaining}</strong> has been paid.</p>
-          <p style="color: #10b981; font-weight: bold;">Session completed and synced successfully!</p>
+          <p style="margin-bottom: 10px;">The session has been completed and synced successfully.</p>
           <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">Reference: ${autoRefNumber}</p>
         </div>
       `,
-        timer: 2500,
+        timer: 2000,
         showConfirmButton: false
       });
 
@@ -468,142 +588,22 @@ const fetchPayments = async () => {
           status: 'completed',
           extension: payment.extension || 0,
           time_end: calculateEndTime(payment.start_time, payment.duration),
-          paymentMethod: 'Cash',
+          paymentMethod: payment.paymentMethod || 'Cash',
           billiard_type: payment.billiard_type,
           amount: totalBill
         });
 
       fetchPayments();
-      return;
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error('Error ending session:', error);
       await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to process payment. Please try again.',
+        text: 'Failed to end session. Please try again.',
         confirmButtonColor: '#ef4444'
       });
-      return;
     }
-  }
-
-  const result = await Swal.fire({
-    title: 'End Session?',
-    text: 'Are you sure you want to end this session?',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonColor: '#10b981',
-    cancelButtonColor: '#6b7280',
-    confirmButtonText: 'Yes, end session',
-    cancelButtonText: 'Cancel'
-  });
-
-  if (!result.isConfirmed) return;
-
-  try {
-    const { error } = await supabase
-      .from('reservation')
-      .update({
-        status: 'completed',
-        payment_status: 'Completed',
-        End_Session: true,
-        End_Session_Notice: true
-      })
-      .eq('id', id);
-
-    if (error) throw error;
-
-    // AUTO SYNC TO PAYMENT TABLE
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    const second = String(now.getSeconds()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const autoRefNumber = `${year}${month}${day}${hour}${minute}${second}${random}`;
-
-    let paymentMethod = 'cash';
-    if (payment.paymentMethod) {
-      const method = payment.paymentMethod.toLowerCase();
-      const validMethods = ['cash', 'gcash', 'card', 'online'];
-      if (validMethods.includes(method)) {
-        paymentMethod = method;
-      }
-    }
-
-    // Check if payment already exists
-    const { data: existingPayment } = await supabase
-      .from('payment')
-      .select('payment_id')
-      .eq('reservation_id', payment.id)
-      .single();
-
-    if (!existingPayment) {
-      const paymentData = {
-        reservation_id: payment.id,
-        account_id: payment.account_id,
-        amount: totalPaid,
-        total_bill: totalBill,
-        method: paymentMethod,
-        payment_date: new Date().toISOString(),
-        reference_number: autoRefNumber,
-        status: 'completed',
-        payment_type: payment.payment_type,
-        table_id: payment.table_id,
-        billiard_type: payment.billiard_type
-      };
-
-      const { error: paymentError } = await supabase
-        .from('payment')
-        .insert([paymentData]);
-
-      if (paymentError) {
-        console.error('Payment insert error:', paymentError);
-        throw new Error('Failed to sync payment: ' + paymentError.message);
-      }
-    }
-
-    await Swal.fire({
-      icon: 'success',
-      title: 'Session Ended!',
-      html: `
-        <div style="text-align: center; margin: 20px 0;">
-          <p style="margin-bottom: 10px;">The session has been completed and synced successfully.</p>
-          <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">Reference: ${autoRefNumber}</p>
-        </div>
-      `,
-      timer: 2000,
-      showConfirmButton: false
-    });
-
-    await supabase
-      .from('transaction_history')
-      .insert({
-        table_id: payment.table_id,
-        reservation_date: payment.reservation_date,
-        start_time: payment.start_time,
-        duration: payment.duration,
-        status: 'completed',
-        extension: payment.extension || 0,
-        time_end: calculateEndTime(payment.start_time, payment.duration),
-        paymentMethod: payment.paymentMethod || 'Cash',
-        billiard_type: payment.billiard_type,
-        amount: totalBill
-      });
-
-    fetchPayments();
-  } catch (error) {
-    console.error('Error ending session:', error);
-    await Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Failed to end session. Please try again.',
-      confirmButtonColor: '#ef4444'
-    });
-  }
-};
+  };
 
   const handleExtensionClick = (payment) => {
     setSelectedPayment(payment);
@@ -612,23 +612,23 @@ const fetchPayments = async () => {
     setShowExtensionModal(true);
   };
 
-const handleExtensionSubmit = async () => {
-  if (!selectedExtension) {
-    await Swal.fire({
-      icon: 'warning',
-      title: 'No Extension Selected',
-      text: 'Please select an extension duration.',
-      confirmButtonColor: '#3b82f6'
-    });
-    return;
-  }
+  const handleExtensionSubmit = async () => {
+    if (!selectedExtension) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'No Extension Selected',
+        text: 'Please select an extension duration.',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
 
-  const extensionData = extensions.find(ext => ext.id === parseInt(selectedExtension));
-  if (!extensionData) return;
+    const extensionData = extensions.find(ext => ext.id === parseInt(selectedExtension));
+    if (!extensionData) return;
 
-  const paymentChoice = await Swal.fire({
-    title: 'Extension Payment',
-    html: `
+    const paymentChoice = await Swal.fire({
+      title: 'Extension Payment',
+      html: `
       <div style="text-align: left; margin: 20px 0;">
         <p style="margin-bottom: 10px;"><strong>Extension Details:</strong></p>
         <p style="margin-bottom: 8px;">Hours: <strong>${extensionData.extension_hours} hour(s)</strong></p>
@@ -638,68 +638,68 @@ const handleExtensionSubmit = async () => {
         <p style="font-weight: bold; color: #2563eb;">When will customer pay for extension?</p>
       </div>
     `,
-    icon: 'question',
-    showDenyButton: true,
-    showCancelButton: true,
-    confirmButtonText: 'Pay Now (Cash)',
-    denyButtonText: 'Pay Later',
-    cancelButtonText: 'Cancel',
-    confirmButtonColor: '#10b981',
-    denyButtonColor: '#f59e0b',
-    cancelButtonColor: '#6b7280',
-  });
+      icon: 'question',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Pay Now (Cash)',
+      denyButtonText: 'Pay Later',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#10b981',
+      denyButtonColor: '#f59e0b',
+      cancelButtonColor: '#6b7280',
+    });
 
-  if (paymentChoice.isDismissed) return;
+    if (paymentChoice.isDismissed) return;
 
-  const payNow = paymentChoice.isConfirmed;
+    const payNow = paymentChoice.isConfirmed;
 
-  try {
-    const newTotalBill = (selectedPayment.total_bill || 0) + extensionData.price;
-    const extensionHours = Math.round(parseFloat(extensionData.extension_hours));
-    const newExtension = (selectedPayment.extension || 0) + extensionHours;
-    const newDuration = selectedPayment.duration + extensionHours;
+    try {
+      const newTotalBill = (selectedPayment.total_bill || 0) + extensionData.price;
+      const extensionHours = Math.round(parseFloat(extensionData.extension_hours));
+      const newExtension = (selectedPayment.extension || 0) + extensionHours;
+      const newDuration = selectedPayment.duration + extensionHours;
 
-    // Calculate existing extension values
-    const existingTimeExtension = selectedPayment.time_extension || 0;
-    const existingAmountExtension = selectedPayment.amount_extension || 0;
+      // Calculate existing extension values
+      const existingTimeExtension = selectedPayment.time_extension || 0;
+      const existingAmountExtension = selectedPayment.amount_extension || 0;
 
-    // Add new extension to existing
-    const newTimeExtension = existingTimeExtension + extensionHours;
-    const newAmountExtension = existingAmountExtension + extensionData.price;
+      // Add new extension to existing
+      const newTimeExtension = existingTimeExtension + extensionHours;
+      const newAmountExtension = existingAmountExtension + extensionData.price;
 
-    let updateData = {
-      extension: newExtension,
-      duration: newDuration,
-      total_bill: newTotalBill,
-      status: 'ongoing',
-      time_extension: newTimeExtension,
-      amount_extension: newAmountExtension,
-    };
+      let updateData = {
+        extension: newExtension,
+        duration: newDuration,
+        total_bill: newTotalBill,
+        status: 'ongoing',
+        time_extension: newTimeExtension,
+        amount_extension: newAmountExtension,
+      };
 
-    if (payNow) {
-      const paymentType = selectedPayment.payment_type;
+      if (payNow) {
+        const paymentType = selectedPayment.payment_type;
 
-      if (paymentType === 'Full Payment') {
-        updateData.full_amount = newTotalBill;
-      } else if (paymentType === 'Half Payment') {
-        updateData.half_amount = newTotalBill;
+        if (paymentType === 'Full Payment') {
+          updateData.full_amount = newTotalBill;
+        } else if (paymentType === 'Half Payment') {
+          updateData.half_amount = newTotalBill;
+        }
+
+        updateData.paymentMethod = 'Cash';
+        updateData.payment_status = 'Completed';
       }
 
-      updateData.paymentMethod = 'Cash';
-      updateData.payment_status = 'Completed';
-    }
+      const { error } = await supabase
+        .from('reservation')
+        .update(updateData)
+        .eq('id', selectedPayment.id);
 
-    const { error } = await supabase
-      .from('reservation')
-      .update(updateData)
-      .eq('id', selectedPayment.id);
+      if (error) throw error;
 
-    if (error) throw error;
-
-    await Swal.fire({
-      icon: 'success',
-      title: payNow ? 'Extension Paid!' : 'Extension Added!',
-      html: `
+      await Swal.fire({
+        icon: 'success',
+        title: payNow ? 'Extension Paid!' : 'Extension Added!',
+        html: `
         <div style="text-align: left; padding: 20px;">
           <p style="margin-bottom: 10px;"><strong>Extension Details:</strong></p>
           <p style="margin-bottom: 8px;">Time Added: <strong>${extensionHours} hour(s)</strong></p>
@@ -712,38 +712,38 @@ const handleExtensionSubmit = async () => {
           </p>
         </div>
       `,
-      timer: 3000,
-      showConfirmButton: false
-    });
-
-    await supabase
-      .from('transaction_history')
-      .insert({
-        table_id: selectedPayment.table_id,
-        reservation_date: selectedPayment.reservation_date,
-        start_time: selectedPayment.start_time,
-        duration: newDuration,
-        status: 'ongoing',
-        extension: newExtension,
-        time_end: calculateEndTime(selectedPayment.start_time, newDuration),
-        paymentMethod: payNow ? 'Cash' : 'Pending',
-        billiard_type: selectedPayment.billiard_type,
-        amount: newTotalBill
+        timer: 3000,
+        showConfirmButton: false
       });
 
-    setShowExtensionModal(false);
-    setSelectedPayment(null);
-    fetchPayments();
-  } catch (error) {
-    console.error('Error adding extension:', error);
-    await Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Failed to add extension. Please try again.',
-      confirmButtonColor: '#ef4444'
-    });
-  }
-};
+      await supabase
+        .from('transaction_history')
+        .insert({
+          table_id: selectedPayment.table_id,
+          reservation_date: selectedPayment.reservation_date,
+          start_time: selectedPayment.start_time,
+          duration: newDuration,
+          status: 'ongoing',
+          extension: newExtension,
+          time_end: calculateEndTime(selectedPayment.start_time, newDuration),
+          paymentMethod: payNow ? 'Cash' : 'Pending',
+          billiard_type: selectedPayment.billiard_type,
+          amount: newTotalBill
+        });
+
+      setShowExtensionModal(false);
+      setSelectedPayment(null);
+      fetchPayments();
+    } catch (error) {
+      console.error('Error adding extension:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to add extension. Please try again.',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  };
 
   const handleConfirmPaymentClick = (payment) => {
     setSelectedPayment(payment);
@@ -1096,18 +1096,18 @@ const handleExtensionSubmit = async () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
   };
 
-const formatTime = (timeString) => {
-  if (!timeString) return 'N/A';
-  
-  // Assuming time is in "HH:MM" or "HH:MM:SS" format
-  const [hours, minutes] = timeString.split(':');
-  const hour = parseInt(hours, 10);
-  
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
-  
-  return `${displayHour}:${minutes} ${period}`;
-};
+  const formatTime = (timeString) => {
+    if (!timeString) return 'N/A';
+
+    // Assuming time is in "HH:MM" or "HH:MM:SS" format
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
+
+    return `${displayHour}:${minutes} ${period}`;
+  };
 
   const calculateEndTime = (startTime, duration) => {
     if (!startTime || !duration) return 'N/A';
@@ -1133,22 +1133,22 @@ const formatTime = (timeString) => {
 
 
   const getPaginatedPayments = (payments) => {
-  const filtered = getFilteredAndSortedPayments(payments);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const filtered = getFilteredAndSortedPayments(payments);
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
-  return {
-    currentItems,
-    totalPages,
-    totalItems: filtered.length
+    return {
+      currentItems,
+      totalPages,
+      totalItems: filtered.length
+    };
   };
-};
-useEffect(() => {
-  setCurrentPage(1); // Reset to page 1 when changing tabs
-}, [activeTab]);
- 
+  useEffect(() => {
+    setCurrentPage(1); // Reset to page 1 when changing tabs
+  }, [activeTab]);
+
 
   const [tableMap, setTableMap] = useState({});
 
@@ -1184,9 +1184,9 @@ useEffect(() => {
         const reservationNo = (payment.reservation_no || '').toLowerCase();
         const query = searchQuery.toLowerCase();
 
-        return customerName.includes(query) || 
-               tableName.includes(query) || 
-               reservationNo.includes(query);
+        return customerName.includes(query) ||
+          tableName.includes(query) ||
+          reservationNo.includes(query);
       });
     }
 
@@ -1225,21 +1225,19 @@ useEffect(() => {
 
 
     return (
-      <div 
-        key={payment.id} 
-        className={`p-5 transition-all border-2 rounded-xl hover:shadow-lg ${
-          type === 'pending' ? 'border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50' :
+      <div
+        key={payment.id}
+        className={`p-5 transition-all border-2 rounded-xl hover:shadow-lg ${type === 'pending' ? 'border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50' :
           type === 'ongoing' ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50' :
-          'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
-        }`}
+            'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
+          }`}
       >
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className={`flex items-center justify-center w-12 h-12 text-lg font-bold text-white rounded-full ${
-              type === 'pending' ? 'bg-gradient-to-br from-orange-500 to-amber-600' :
+            <div className={`flex items-center justify-center w-12 h-12 text-lg font-bold text-white rounded-full ${type === 'pending' ? 'bg-gradient-to-br from-orange-500 to-amber-600' :
               type === 'ongoing' ? 'bg-gradient-to-br from-green-500 to-emerald-600' :
-              'bg-gradient-to-br from-gray-500 to-gray-600'
-            }`}>
+                'bg-gradient-to-br from-gray-500 to-gray-600'
+              }`}>
               {customerName.charAt(0)}
             </div>
             <div>
@@ -1249,12 +1247,14 @@ useEffect(() => {
               </p>
             </div>
           </div>
-          <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-md text-white ${
-            type === 'pending' ? 'bg-orange-500' :
+          <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-md text-white ${type === 'pending' ? 'bg-orange-500' :
             type === 'ongoing' ? 'bg-green-500' :
-            'bg-gray-500'
-          }`}>
-            {type === 'pending' ? 'Pending' : type === 'ongoing' ? 'Ongoing' : 'Done'}
+              'bg-gray-500'
+            }`}>
+            {type === 'pending' ? 'Pending' :
+              type === 'ongoing' ? 'Ongoing' :
+                payment.status === 'synced' ? 'Synced' : // ✅ DAGDAG: Show "Synced" text
+                  'Completed'}
           </span>
         </div>
 
@@ -1273,21 +1273,21 @@ useEffect(() => {
                 </p>
               </>
             )}
-         {(payment.time_extension > 0 || payment.amount_extension > 0) && (
-  <div className="flex items-center gap-2 p-2 mt-2 border border-blue-200 rounded-lg bg-blue-50">
-    <Plus size={14} className="text-blue-600" />
-    <div className="text-sm">
-      <span className="font-semibold text-blue-800">
-        Extension: {payment.time_extension || 0}h
-      </span>
-      {payment.amount_extension > 0 && (
-        <span className="ml-2 text-blue-700">
-          (+₱{payment.amount_extension})
-        </span>
-      )}
-    </div>
-  </div>
-)}
+            {(payment.time_extension > 0 || payment.amount_extension > 0) && (
+              <div className="flex items-center gap-2 p-2 mt-2 border border-blue-200 rounded-lg bg-blue-50">
+                <Plus size={14} className="text-blue-600" />
+                <div className="text-sm">
+                  <span className="font-semibold text-blue-800">
+                    Extension: {payment.time_extension || 0}h
+                  </span>
+                  {payment.amount_extension > 0 && (
+                    <span className="ml-2 text-blue-700">
+                      (+₱{payment.amount_extension})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             <p className="text-sm text-gray-700">
               <span className="font-semibold">Amount:</span> ₱{payment.total_bill || 0}
             </p>
@@ -1345,10 +1345,9 @@ useEffect(() => {
         <div className={`grid ${type === 'completed' ? 'grid-cols-2' : 'grid-cols-2'} gap-2 mb-2`}>
           <button
             onClick={() => handleViewDetails(payment)}
-            className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold transition-all bg-white border-2 rounded-lg ${
-              type === 'pending' ? 'text-orange-700 border-orange-300 hover:bg-orange-50' :
+            className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold transition-all bg-white border-2 rounded-lg ${type === 'pending' ? 'text-orange-700 border-orange-300 hover:bg-orange-50' :
               'text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
+              }`}
           >
             <Eye size={16} />
             View
@@ -1362,9 +1361,9 @@ useEffect(() => {
               Extend
             </button>
           )}
-        
+
         </div>
-{type === 'pending' && (
+        {type === 'pending' && (
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button
               onClick={() => handleCancelReservation(payment.id)}
@@ -1427,33 +1426,30 @@ useEffect(() => {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab('pending')}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${
-              activeTab === 'pending'
-                ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${activeTab === 'pending'
+              ? 'bg-orange-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <Hourglass size={20} />
             Pending ({pendingPayments.length})
           </button>
           <button
             onClick={() => setActiveTab('ongoing')}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${
-              activeTab === 'ongoing'
-                ? 'bg-green-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${activeTab === 'ongoing'
+              ? 'bg-green-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <Clock size={20} />
             Ongoing ({activePayments.length})
           </button>
           <button
             onClick={() => setActiveTab('completed')}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${
-              activeTab === 'completed'
-                ? 'bg-gray-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-all ${activeTab === 'completed'
+              ? 'bg-gray-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <CheckCircle size={20} />
             Completed ({completedPayments.length})
@@ -1502,137 +1498,136 @@ useEffect(() => {
       </div>
 
       {/* Content based on active tab */}
-   <div>
-  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-    {activeTab === 'pending' && (
-      (() => {
-        const { currentItems, totalPages, totalItems } = getPaginatedPayments(pendingPayments);
-        return (
-          <>
-            {currentItems.length > 0 ? (
-              currentItems.map(payment => renderPaymentCard(payment, 'pending'))
-            ) : (
-              <div className="col-span-full">
-                <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
-                  <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
-                  <p className="font-semibold text-gray-500">No pending payments found</p>
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()
-    )}
+      <div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {activeTab === 'pending' && (
+            (() => {
+              const { currentItems, totalPages, totalItems } = getPaginatedPayments(pendingPayments);
+              return (
+                <>
+                  {currentItems.length > 0 ? (
+                    currentItems.map(payment => renderPaymentCard(payment, 'pending'))
+                  ) : (
+                    <div className="col-span-full">
+                      <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
+                        <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
+                        <p className="font-semibold text-gray-500">No pending payments found</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()
+          )}
 
-    {activeTab === 'ongoing' && (
-      (() => {
-        const { currentItems, totalPages, totalItems } = getPaginatedPayments(activePayments);
-        return (
-          <>
-            {currentItems.length > 0 ? (
-              currentItems.map(payment => renderPaymentCard(payment, 'ongoing'))
-            ) : (
-              <div className="col-span-full">
-                <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
-                  <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
-                  <p className="font-semibold text-gray-500">No ongoing sessions found</p>
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()
-    )}
+          {activeTab === 'ongoing' && (
+            (() => {
+              const { currentItems, totalPages, totalItems } = getPaginatedPayments(activePayments);
+              return (
+                <>
+                  {currentItems.length > 0 ? (
+                    currentItems.map(payment => renderPaymentCard(payment, 'ongoing'))
+                  ) : (
+                    <div className="col-span-full">
+                      <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
+                        <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
+                        <p className="font-semibold text-gray-500">No ongoing sessions found</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()
+          )}
 
-    {activeTab === 'completed' && (
-      (() => {
-        const { currentItems, totalPages, totalItems } = getPaginatedPayments(completedPayments);
-        return (
-          <>
-            {currentItems.length > 0 ? (
-              currentItems.map(payment => renderPaymentCard(payment, 'completed'))
-            ) : (
-              <div className="col-span-full">
-                <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
-                  <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
-                  <p className="font-semibold text-gray-500">No completed sessions found</p>
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()
-    )}
-  </div>
-
-  {/* Pagination Controls */}
-  {(() => {
-    const payments = activeTab === 'pending' ? pendingPayments : 
-                     activeTab === 'ongoing' ? activePayments : 
-                     completedPayments;
-    const { totalPages, totalItems } = getPaginatedPayments(payments);
-
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className="flex items-center justify-between p-4 mt-6 bg-white shadow-lg rounded-xl">
-        <div className="text-sm text-gray-600">
-          Showing page {currentPage} of {totalPages} ({totalItems} total)
+          {activeTab === 'completed' && (
+            (() => {
+              const { currentItems, totalPages, totalItems } = getPaginatedPayments(completedPayments);
+              return (
+                <>
+                  {currentItems.length > 0 ? (
+                    currentItems.map(payment => renderPaymentCard(payment, 'completed'))
+                  ) : (
+                    <div className="col-span-full">
+                      <div className="py-12 text-center bg-white shadow-lg rounded-2xl">
+                        <CheckCircle size={48} className="mx-auto mb-3 text-gray-300" />
+                        <p className="font-semibold text-gray-500">No completed sessions found</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()
+          )}
         </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-4 py-2 font-semibold text-gray-700 transition-all bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          
-          <div className="flex gap-1">
-            {[...Array(totalPages)].map((_, idx) => {
-              const pageNum = idx + 1;
-              // Show first page, last page, current page, and pages around current
-              if (
-                pageNum === 1 ||
-                pageNum === totalPages ||
-                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-              ) {
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-4 py-2 font-semibold rounded-lg transition-all ${
-                      currentPage === pageNum
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              } else if (
-                pageNum === currentPage - 2 ||
-                pageNum === currentPage + 2
-              ) {
-                return <span key={pageNum} className="px-2 py-2 text-gray-500">...</span>;
-              }
-              return null;
-            })}
-          </div>
-          
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-4 py-2 font-semibold text-gray-700 transition-all bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
+
+        {/* Pagination Controls */}
+        {(() => {
+          const payments = activeTab === 'pending' ? pendingPayments :
+            activeTab === 'ongoing' ? activePayments :
+              completedPayments;
+          const { totalPages, totalItems } = getPaginatedPayments(payments);
+
+          if (totalPages <= 1) return null;
+
+          return (
+            <div className="flex items-center justify-between p-4 mt-6 bg-white shadow-lg rounded-xl">
+              <div className="text-sm text-gray-600">
+                Showing page {currentPage} of {totalPages} ({totalItems} total)
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 font-semibold text-gray-700 transition-all bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                <div className="flex gap-1">
+                  {[...Array(totalPages)].map((_, idx) => {
+                    const pageNum = idx + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-4 py-2 font-semibold rounded-lg transition-all ${currentPage === pageNum
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (
+                      pageNum === currentPage - 2 ||
+                      pageNum === currentPage + 2
+                    ) {
+                      return <span key={pageNum} className="px-2 py-2 text-gray-500">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 font-semibold text-gray-700 transition-all bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
-    );
-  })()}
-</div>
 
       {/* Extension Modal */}
       {showExtensionModal && selectedPayment && (
@@ -1720,7 +1715,7 @@ useEffect(() => {
       )}
 
       {/* Confirm Payment Modal */}
-      
+
       {showConfirmModal && selectedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-md bg-white shadow-2xl rounded-2xl">
@@ -1741,23 +1736,23 @@ useEffect(() => {
                   <p className="font-bold text-gray-900 capitalize">{selectedPayment.payment_type || 'N/A'}</p>
                 </div>
 
-              {(selectedPayment.time_extension > 0 || selectedPayment.amount_extension > 0) && (
-  <div className="col-span-2 p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
-    <p className="mb-2 text-sm font-semibold text-blue-600">📊 Extension Summary</p>
-    <div className="space-y-2">
-      <div className="flex justify-between">
-        <span className="text-sm text-blue-700">Total Extension Time:</span>
-        <span className="font-bold text-blue-900">{selectedPayment.time_extension || 0} hour(s)</span>
-      </div>
-      {selectedPayment.amount_extension > 0 && (
-        <div className="flex justify-between">
-          <span className="text-sm text-blue-700">Total Extension Cost:</span>
-          <span className="font-bold text-blue-900">₱{selectedPayment.amount_extension}</span>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+                {(selectedPayment.time_extension > 0 || selectedPayment.amount_extension > 0) && (
+                  <div className="col-span-2 p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+                    <p className="mb-2 text-sm font-semibold text-blue-600">📊 Extension Summary</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-blue-700">Total Extension Time:</span>
+                        <span className="font-bold text-blue-900">{selectedPayment.time_extension || 0} hour(s)</span>
+                      </div>
+                      {selectedPayment.amount_extension > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-blue-700">Total Extension Cost:</span>
+                          <span className="font-bold text-blue-900">₱{selectedPayment.amount_extension}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-4 border-2 border-indigo-200 rounded-lg bg-indigo-50">
                   <p className="mb-1 text-sm text-indigo-600">Total Bill</p>
@@ -2008,7 +2003,7 @@ useEffect(() => {
           </div>
         </div>
       )}
-   {/* Sync Payment Modal */}
+      {/* Sync Payment Modal */}
       {showSyncModal && selectedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-md bg-white shadow-2xl rounded-2xl">
@@ -2082,4 +2077,4 @@ useEffect(() => {
     </div>
   );
 }
-   
+
