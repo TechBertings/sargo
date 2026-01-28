@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Clock, Hourglass, User, Calendar, CheckCircle, XCircle, Eye, RefreshCw, Plus, Search, Filter } from 'lucide-react';
+import { CreditCard, Clock, Hourglass, User, Calendar, CheckCircle, XCircle, Eye, RefreshCw, Plus, Search, Filter, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import Swal from 'sweetalert2';
 
@@ -20,9 +20,10 @@ export default function FinalizePayment() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [selectedExtension, setSelectedExtension] = useState('');
   const [combinedData, setCombinedData] = useState([]);
-
-  // SYNC PAYMENT STATES - MUST BE HERE
-
+  
+ // SYNC PAYMENT STATES
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncAmount, setSyncAmount] = useState('');
 
   // TAB & FILTER STATES
   const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'ongoing', 'completed'
@@ -49,7 +50,179 @@ export default function FinalizePayment() {
       console.error('Error fetching extensions:', error);
     }
   };
+const handleSyncPaymentClick = (payment) => {
+    setSelectedPayment(payment);
+    setSyncAmount(payment.total_bill?.toString() || '');
+    setShowSyncModal(true);
+  };
 
+ const handleSyncPaymentSubmit = async () => {
+  if (!selectedPayment || !syncAmount) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Amount Required',
+      text: 'Please enter the total bill amount.',
+      confirmButtonColor: '#f59e0b'
+    });
+    return;
+  }
+
+  const amount = parseFloat(syncAmount);
+  if (isNaN(amount) || amount <= 0) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Invalid Amount',
+      text: 'Please enter a valid amount.',
+      confirmButtonColor: '#ef4444'
+    });
+    return;
+  }
+
+  const confirmSync = await Swal.fire({
+    title: 'Sync Payment?',
+    html: `
+      <div style="text-align: left; padding: 20px;">
+        <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #0ea5e9;">
+          <p style="margin: 5px 0; color: #0369a1; font-size: 14px;">Total Bill Amount</p>
+          <p style="margin: 5px 0; font-weight: bold; font-size: 24px; color: #0c4a6e;">₱${amount}</p>
+        </div>
+        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+          This will sync the payment to the payment table and mark the reservation as synced.
+        </p>
+        <p style="color: #059669; font-size: 13px; font-weight: 600;">
+          ✅ Table will become available for new bookings after sync
+        </p>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sync Payment',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#3b82f6',
+    cancelButtonColor: '#6b7280',
+  });
+
+  if (!confirmSync.isConfirmed) return;
+
+  Swal.fire({
+    title: 'Syncing Payment...',
+    html: '<div style="padding: 20px;"><p style="margin-top: 15px; font-size: 16px;">Please wait...</p></div>',
+    allowOutsideClick: false,
+    showConfirmButton: false,
+    didOpen: () => {
+      Swal.showLoading();
+    }
+  });
+
+  try {
+    // ✅ Update reservation with new total_bill AND set status to "synced"
+    const { error: updateError } = await supabase
+      .from('reservation')
+      .update({ 
+        total_bill: amount,
+        status: 'synced',  // ✅ NEW: Mark as synced
+        payment_status: 'Completed'
+      })
+      .eq('id', selectedPayment.id);
+
+    if (updateError) throw updateError;
+
+    // Generate reference number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    const second = String(now.getSeconds()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const autoRefNumber = `${year}${month}${day}${hour}${minute}${second}${random}`;
+
+    let paymentMethod = 'cash';
+    if (selectedPayment.paymentMethod) {
+      const method = selectedPayment.paymentMethod.toLowerCase();
+      const validMethods = ['cash', 'gcash', 'card', 'online'];
+      if (validMethods.includes(method)) {
+        paymentMethod = method;
+      }
+    }
+
+    // Check if payment already exists
+    const { data: existingPayment } = await supabase
+      .from('payment')
+      .select('payment_id')
+      .eq('reservation_id', selectedPayment.id)
+      .single();
+
+    if (existingPayment) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Payment Already Synced',
+        text: 'This reservation has already been synced to the payment table.',
+        confirmButtonColor: '#f59e0b'
+      });
+      setShowSyncModal(false);
+      fetchPayments(); // Refresh to remove from list
+      return;
+    }
+
+    // Insert into payment table
+    const paymentData = {
+      reservation_id: selectedPayment.id,
+      account_id: selectedPayment.account_id,
+      amount: amount,
+      total_bill: amount,
+      method: paymentMethod,
+      payment_date: new Date().toISOString(),
+      reference_number: autoRefNumber,
+      status: 'completed',
+      payment_type: selectedPayment.payment_type,
+      table_id: selectedPayment.table_id,
+      billiard_type: selectedPayment.billiard_type
+    };
+
+    const { error: paymentError } = await supabase
+      .from('payment')
+      .insert([paymentData]);
+
+    if (paymentError) {
+      console.error('Payment insert error:', paymentError);
+      throw new Error('Failed to sync payment: ' + paymentError.message);
+    }
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'Payment Synced!',
+      html: `
+        <div style="text-align: center; margin: 20px 0;">
+          <p style="margin-bottom: 10px;">Payment has been successfully synced!</p>
+          <p style="color: #10b981; font-weight: bold;">Amount: ₱${amount}</p>
+          <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">Reference: ${autoRefNumber}</p>
+          <hr style="margin: 15px 0;">
+          <p style="color: #059669; font-size: 14px; font-weight: 600;">
+            ✅ Table is now available for new bookings
+          </p>
+        </div>
+      `,
+      timer: 3000,
+      showConfirmButton: false
+    });
+
+    setShowSyncModal(false);
+    setSelectedPayment(null);
+    setSyncAmount('');
+    fetchPayments(); // ✅ This will now exclude synced reservations
+
+  } catch (error) {
+    console.error('Error syncing payment:', error);
+    await Swal.fire({
+      icon: 'error',
+      title: 'Sync Failed',
+      text: error.message || 'Failed to sync payment. Please try again.',
+      confirmButtonColor: '#ef4444'
+    });
+  }
+};
   const getExtensionPrice = (billiardType, hours) => {
     const extension = extensions.find(
       ext => ext.billiard_type === billiardType && parseFloat(ext.extension_hours) === parseFloat(hours)
@@ -101,55 +274,55 @@ export default function FinalizePayment() {
     }
   };
 
-  const fetchPayments = async () => {
-    setLoading(true);
-    try {
-      const { data: reservationData, error: reservationError } = await supabase
-        .from('reservation')
-        .select('*')
-        .in('status', ['ongoing', 'approved', 'completed'])
-        .order('reservation_date', { ascending: false })
-        .order('start_time', { ascending: true });
+const fetchPayments = async () => {
+  setLoading(true);
+  try {
+    const { data: reservationData, error: reservationError } = await supabase
+      .from('reservation')
+      .select('*')
+      .in('status', ['ongoing', 'approved', 'completed']) // ✅ Removed 'synced' from here
+      .order('reservation_date', { ascending: false })
+      .order('start_time', { ascending: true });
 
-      if (reservationError) throw reservationError;
+    if (reservationError) throw reservationError;
 
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('accounts')
-        .select('account_id, email');
+    const { data: accountsData, error: accountsError } = await supabase
+      .from('accounts')
+      .select('account_id, email');
 
-      const { data: customersData, error: customersError } = await supabase
-        .from('customer')
-        .select('customer_id, account_id, first_name, last_name, middle_name');
+    const { data: customersData, error: customersError } = await supabase
+      .from('customer')
+      .select('customer_id, account_id, first_name, last_name, middle_name');
 
-      if (accountsError) throw accountsError;
-      if (customersError) throw customersError;
+    if (accountsError) throw accountsError;
+    if (customersError) throw customersError;
 
-      const combinedData = reservationData.map(reservation => {
-        const account = accountsData.find(acc => acc.account_id === reservation.account_id);
-        const customer = customersData.find(c => c.account_id === reservation.account_id);
-        return {
-          ...reservation,
-          accounts: {
-            ...account,
-            customer: customer || null
-          }
-        };
-      });
+    const combinedData = reservationData.map(reservation => {
+      const account = accountsData.find(acc => acc.account_id === reservation.account_id);
+      const customer = customersData.find(c => c.account_id === reservation.account_id);
+      return {
+        ...reservation,
+        accounts: {
+          ...account,
+          customer: customer || null
+        }
+      };
+    });
 
-      const active = combinedData.filter(r => r.status === 'ongoing');
-      const pending = combinedData.filter(r => r.status === 'approved');
-      const completed = combinedData.filter(r => r.status === 'completed');
+    const active = combinedData.filter(r => r.status === 'ongoing');
+    const pending = combinedData.filter(r => r.status === 'approved');
+    const completed = combinedData.filter(r => r.status === 'completed');
 
-      setActivePayments(active);
-      setPendingPayments(pending);
-      setCompletedPayments(completed);
+    setActivePayments(active);
+    setPendingPayments(pending);
+    setCompletedPayments(completed);
 
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -1191,8 +1364,7 @@ useEffect(() => {
           )}
         
         </div>
-
-        {type === 'pending' && (
+{type === 'pending' && (
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button
               onClick={() => handleCancelReservation(payment.id)}
@@ -1200,9 +1372,15 @@ useEffect(() => {
             >
               Cancel
             </button>
+            <button
+              onClick={() => handleSyncPaymentClick(payment)}
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white transition-all bg-blue-500 rounded-lg shadow-md hover:bg-blue-600"
+            >
+              <Upload size={16} />
+              Sync
+            </button>
           </div>
         )}
-
         {type === 'pending' && (
           <button
             onClick={() => handleConfirmPaymentClick(payment)}
@@ -1542,6 +1720,7 @@ useEffect(() => {
       )}
 
       {/* Confirm Payment Modal */}
+      
       {showConfirmModal && selectedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-md bg-white shadow-2xl rounded-2xl">
@@ -1829,8 +2008,78 @@ useEffect(() => {
           </div>
         </div>
       )}
+   {/* Sync Payment Modal */}
+      {showSyncModal && selectedPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="w-full max-w-md bg-white shadow-2xl rounded-2xl">
+            <div className="p-6 text-white bg-gradient-to-r from-blue-500 to-indigo-500">
+              <h3 className="mb-1 text-2xl font-bold">Sync Payment</h3>
+              <p className="text-blue-100">
+                {`${selectedPayment.accounts?.customer?.first_name || ''} ${selectedPayment.accounts?.customer?.last_name || ''}`.trim() || 'N/A'}
+              </p>
+            </div>
 
-   
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-gray-50">
+                  <p className="mb-1 text-sm text-gray-600">Reservation Number</p>
+                  <p className="font-bold text-gray-900">{selectedPayment.reservation_no || 'N/A'}</p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-gray-50">
+                  <p className="mb-1 text-sm text-gray-600">Payment Type</p>
+                  <p className="font-bold text-gray-900 capitalize">{selectedPayment.payment_type || 'N/A'}</p>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-semibold text-gray-700">
+                    Enter Total Bill Amount *
+                  </label>
+                  <input
+                    type="number"
+                    value={syncAmount}
+                    onChange={(e) => setSyncAmount(e.target.value)}
+                    placeholder="Enter total bill amount"
+                    className="w-full px-4 py-3 text-lg font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    This amount will be stored in total_bill and synced to payment table
+                  </p>
+                </div>
+
+                {syncAmount && (
+                  <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+                    <p className="mb-2 text-sm font-semibold text-blue-600">Amount to Sync</p>
+                    <p className="text-3xl font-bold text-blue-900">₱{parseFloat(syncAmount).toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowSyncModal(false);
+                    setSelectedPayment(null);
+                    setSyncAmount('');
+                  }}
+                  className="flex-1 px-4 py-3 font-semibold text-gray-700 transition-all bg-gray-200 rounded-lg hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSyncPaymentSubmit}
+                  className="flex items-center justify-center flex-1 gap-2 px-4 py-3 font-semibold text-white transition-all rounded-lg shadow-md bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+                >
+                  <Upload size={20} />
+                  Sync Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+   
