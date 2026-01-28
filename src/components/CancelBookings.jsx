@@ -27,10 +27,21 @@ export default function CancelBookings() {
   
 useEffect(() => {
   const session = JSON.parse(localStorage.getItem('userSession'));
+  
+  console.log('🔍 DEBUG SESSION:', {
+    role: session?.role,
+    roleType: typeof session?.role,
+    accountId: session?.account_id,
+    fullSession: session
+  });
+  
   if (session) {
     setUserRole(session.role);
     setCurrentAccountId(session.account_id);
   }
+  
+  // Also fetch bookings on mount
+  fetchCancelledBookings();
 }, []);
   const fetchCancelledBookings = async () => {
     setLoading(true);
@@ -163,6 +174,8 @@ useEffect(() => {
       setEditAmount(booking.full_amount || '');
     } else if (booking.payment_type === 'Half Payment') {
       setEditAmount(booking.half_amount || '');
+    } else if (booking.payment_type === 'Partial Payment') {
+      setEditAmount(booking.partial_amount || '');
     } else {
       setEditAmount('');
     }
@@ -209,6 +222,7 @@ const handleEditSubmit = async () => {
       payment_type: editPaymentType,
       full_amount: null,
       half_amount: null,
+      partial_amount: null,
       cancelled_amount: amount  // ✅ Store in cancelled_amount
     };
 
@@ -216,7 +230,9 @@ const handleEditSubmit = async () => {
       updateData.full_amount = amount;
     } else if (editPaymentType === 'Half Payment') {
       updateData.half_amount = amount;
-    } 
+    } else if (editPaymentType === 'Partial Payment') {
+      updateData.partial_amount = amount;
+    }
 
     console.log('Updating with data:', updateData);
     console.log('Booking ID:', selectedBooking.id);
@@ -294,7 +310,16 @@ const handleEditSubmit = async () => {
     setShowSyncModal(true);
   };
 
-const handleSyncSubmit = async () => {
+ const handleSyncSubmit = async () => {
+  if (!referenceNumber.trim()) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Reference Number Required',
+      text: 'Please enter a reference number.',
+      confirmButtonColor: '#f59e0b'
+    });
+    return;
+  }
 
   setSyncing(true);
 
@@ -346,7 +371,6 @@ const handleSyncSubmit = async () => {
         reservation_id: selectedBooking.id,
         account_id: selectedBooking.account_id,
         amount: totalAmount,
-        total_bill: selectedBooking.total_bill || 0,  // ✅ Add total_bill
         method: paymentMethod,
         payment_date: new Date().toISOString(),
         reference_number: referenceNumber.trim(),
@@ -388,10 +412,17 @@ const handleSyncSubmit = async () => {
   };
 
   const formatTime = (timeString) => {
-    if (!timeString) return 'N/A';
-    return timeString;
-  };
-
+  if (!timeString) return 'N/A';
+  
+  // Assuming time is in "HH:MM" or "HH:MM:SS" format
+  const [hours, minutes] = timeString.split(':');
+  const hour = parseInt(hours, 10);
+  
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
+  
+  return `${displayHour}:${minutes} ${period}`;
+};
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-orange-50">
@@ -445,20 +476,28 @@ const handleSyncSubmit = async () => {
   {cancelledBookings.length > 0 ? (
     cancelledBookings
       // Filter bookings based on role
-      .filter((booking) => {
-        if (userRole === 'admin' || userRole === 'superadmin') {
-          return true; // Admin sees all
-        }
-        // Customer only sees their own cancelled bookings
-        return booking.account_id === currentAccountId;
-      })
-      .map((booking) => {
-        const customerName = `${booking.accounts?.customer?.first_name || ''} ${booking.accounts?.customer?.last_name || ''}`.trim() || 'N/A';
-        const isSynced = syncedPayments.includes(booking.id);
-const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'frontdesk' || userRole === 'manager';
+ .filter((booking) => {
+  // Define roles that can see all bookings (case-insensitive)
+  const roleToCheck = userRole?.toLowerCase();
+  const canViewAll = ['admin', 'superadmin', 'frontdesk', 'manager'].includes(roleToCheck);
+  
+  if (canViewAll) {
+    return true; // Show all bookings
+  }
+  
+  // Customer only sees their own
+  return booking.account_id === currentAccountId;
+})
+   .map((booking) => {
+  const customerName = `${booking.accounts?.customer?.first_name || ''} ${booking.accounts?.customer?.last_name || ''}`.trim() || 'N/A';
+  const isSynced = syncedPayments.includes(booking.id);
+  
+  // ✅ FIX: Make isAdmin case-insensitive
+  const roleToCheck = userRole?.toLowerCase();
+  const isAdmin = ['admin', 'superadmin', 'frontdesk', 'manager'].includes(roleToCheck);
 
-        return (
-          <div key={booking.id} className="p-5 transition-all border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl hover:shadow-lg">
+  return (
+    <div key={booking.id} className="p-5 transition-all border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl hover:shadow-lg">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-12 h-12 text-lg font-bold text-white rounded-full bg-gradient-to-br from-red-500 to-pink-600">
@@ -494,6 +533,8 @@ const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole ==
                     ? (booking.full_amount || 0)
                     : booking.payment_type === 'Half Payment'
                     ? (booking.half_amount || 0)
+                    : booking.payment_type === 'Partial Payment'
+                    ? (booking.partial_amount || 0)
                     : 0
                   }
                 </p>
@@ -642,7 +683,15 @@ const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole ==
                       </div>
                     </>
                   )}
-   
+
+                  {selectedBooking.payment_type === 'Partial Payment' && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700">Partial Payment:</span>
+                        <span className="text-lg font-bold text-red-600">₱{selectedBooking.partial_amount || 0}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -690,6 +739,7 @@ const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole ==
                     <option value="">Select payment type...</option>
                     <option value="Full Payment">Full Payment</option>
                     <option value="Half Payment">Half Payment</option>
+                    <option value="Partial Payment">Partial Payment</option>
                   </select>
                 </div>
 
@@ -775,14 +825,32 @@ const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole ==
                 </div>
 
                 <div className="p-4 border-2 border-red-200 rounded-lg bg-red-50">
-                  <p className="mb-1 text-sm text-red-600">Cancelled Amount</p>
+                  <p className="mb-1 text-sm text-red-600">Refund Amount</p>
                   <p className="text-3xl font-bold text-red-900">
                     ₱{selectedBooking.payment_type === 'Full Payment' 
                       ? (selectedBooking.full_amount || 0)
                       : selectedBooking.payment_type === 'Half Payment'
                       ? (selectedBooking.half_amount || 0)
+                      : selectedBooking.payment_type === 'Partial Payment'
+                      ? (selectedBooking.partial_amount || 0)
                       : 0
                     }
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-semibold text-gray-700">
+                    Reference Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder="Enter reference number"
+                    className="w-full px-4 py-3 text-lg font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter a unique reference number for this cancelled payment
                   </p>
                 </div>
               </div>
