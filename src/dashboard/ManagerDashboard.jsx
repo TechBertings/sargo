@@ -496,7 +496,7 @@ const formatTime = (time) => {
       await supabase
         .from("reservation")
         .update({
-          status: "rejected",
+          status: "pending",
           Reject_Name: userRole, // Store the role: "manager" or "frontdesk"
           remark_reject: formValues.reason,
           reject_comment: formValues.comment || null,
